@@ -202,6 +202,11 @@ canvas {
    color: #808080;
 }
 
+.info .infobox {
+   /*font-weight: bold; */
+   color: #000;
+}
+
 #menuVersion {
    text-align: center; 
    font-size: 0.6em;
