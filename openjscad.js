@@ -1057,7 +1057,7 @@ OpenJsCad.Processor.prototype = {
     this.parametersdiv.appendChild(this.parameterstable);
 
     var parseParametersButton = document.createElement("button");
-    parseParametersButton.innerHTML = "Update";
+    parseParametersButton.innerHTML = "Aanpassingen Doorvoeren";
     parseParametersButton.onclick = function(e) {
       that.rebuildSolid();
     };
@@ -1070,7 +1070,7 @@ OpenJsCad.Processor.prototype = {
     this.parametersdiv.appendChild(instantUpdateCheckbox);
 
     var instantUpdateCheckboxText = document.createElement("span");
-    instantUpdateCheckboxText.innerHTML = "Instant Update";
+    instantUpdateCheckboxText.innerHTML = "Automatisch Aanpassen";
     instantUpdateCheckboxText.id = "instantUpdateLabel";
     this.parametersdiv.appendChild(instantUpdateCheckboxText);
 
@@ -1118,7 +1118,7 @@ OpenJsCad.Processor.prototype = {
   
   updateDownloadLink: function() {
     var ext = this.selectedFormatInfo().extension;
-    this.generateOutputFileButton.innerHTML = "Generate "+ext.toUpperCase();
+    this.generateOutputFileButton.innerHTML = "Genereer "+ext.toUpperCase();
   },
   
   clearViewer: function() {
@@ -1409,7 +1409,8 @@ OpenJsCad.Processor.prototype = {
         mimetype: "application/sla",
         },
       stlb: {
-        displayName: "STL (Binary)",
+        displayName: "STL (Binair)",
+        displayNameEN: "STL (Binary)",
         extension: "stl",
         mimetype: "application/sla",
         },
