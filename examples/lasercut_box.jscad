@@ -41,7 +41,7 @@ function getParameterDefinitions()
     {name: 'width', type: 'float', initial: 100, caption: "Breedte doos in mm:", captionEN: "Width of box in mm:"},
     {name: 'height', type: 'float', initial: 100, caption: "Hoogte doos in mm:", captionEN: "Height of box in mm:"},
     {name: 'depth', type: 'float', initial: 50, caption: "Diepte in mm:", captionEN: "Depth in mm:"},
-    {name: 'mitersize', type: 'int', initial: 10, caption: "Kartels (tab) grootte in mm:", captionEN: "Miter (tab) size in mm:"},
+    {name: 'mitersize', type: 'int', initial: 10, caption: "Tanden (tabs) grootte in mm:", captionEN: "Miter (tab) size in mm:"},
     {name: 'thick', type: 'float', initial: 3, caption: "Dikte materiaal:", captionEN: "Thickness of the material:"},
     {name: 'kerf', type: 'float', initial: 0.16, caption: "Breedte laserstraal in mm:", captionEN: "Width of laser beam cut in mm:"},
 
@@ -60,7 +60,8 @@ function getParameterDefinitions()
       values: ["CLOSED", "OPEN"],
       captions: ["Gesloten", "Geen Deksel"],
       captionsEN: ["Closed", "Open Lid"],
-      caption: 'Lid:',
+      caption: 'Deksel:',
+      captionEN: 'Lid:',
       initial: "DRAFT"
     },
     {
@@ -69,7 +70,8 @@ function getParameterDefinitions()
       values: ["ALL", "BOTTOM", "TOP", "LEFT", "RIGHT", "FRONT", "BACK"],
       captions: ["Alle Zijden", "Bodem", "Top", "Links", "Rechts", "Voor", "Achter"],
       captionsEN: ["All Sides", "Bottom", "Top", "Left", "Right", "Front", "Back"],
-      caption: 'Show:',
+      caption: 'Toon:',
+      captionEN: 'Show:',
       initial: "ALL"
     },
     {name: 'hw1', type: 'float', initial: 0, caption: "Gat bodem breedte", captionEN: "Hole bottom width:"},
@@ -83,6 +85,7 @@ function getParameterDefinitions()
 
   ];
 }
+
 
 
 
@@ -180,7 +183,7 @@ function main(params)
         shape2 = shape2.subtract(hole2);
     }
     if (! on_plate) {
-        shape2 = shape2.mirrored().rotateY(90).translate([-width/2 - thick -1, 0, depth/2]);
+        shape2 = shape2.mirroredX().rotateY(90).translate([-width/2 - thick -1, 0, depth/2]);
     }
     
     sidenr += 1;
@@ -492,7 +495,7 @@ function squareframe(x, y, w, h, nrmiterw, nrmiterh, thick, invertX, invertY, op
     // add all in a polygon
     OpenJsCad.log(["top", sidetop[0]]);
     OpenJsCad.log(["top", sidetop[1]]);
-    for (i=0; i<sidetop[0].length; i++ ) {
+    for (i=0; i< sidetop[0].length; i++ ) {
         polypt[nrpoly+1] = new CSG.Vector2D( sidetop[0][i] + polypt[nrpoly].x , sidetop[1][i] + polypt[nrpoly].y );
         nrpoly += 1;
     }
