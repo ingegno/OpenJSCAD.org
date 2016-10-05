@@ -371,7 +371,7 @@ function side(w,h,corner_sizex,corner_sizey,thick,cut_width, div_x, div_y,
     var dy = corner_sizey*ym;
     if (invertX) {dx-=thick*xm;}
     if (invertY) {dy-=thick*ym;}
-    half_cut = cut_width/2 * (xm+ym);
+    half_cut = cut_width * (xm+ym);
     if (invertY && xm) { 
         half_cut = -half_cut;
     }
