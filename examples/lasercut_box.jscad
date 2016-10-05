@@ -294,6 +294,7 @@ function main(params)
         } else if (side_to_show == 4 && !openlid) {
             return new CAG().union([shape4_2d]);
         } else if (side_to_show == 4 && openlid) {
+            alert("ERROR: side 4 does not exist, no lid requested!");
             throw new Error("ERROR: side 4 does not exist, no lid requested!");
             return [];
         } else if (side_to_show == 5) {

@@ -57,6 +57,35 @@ Todo:
 <script src="openscad.js"></script>
 <script src="underscore.js"></script>
 <script src="openscad-openjscad-translator.js"></script>
+
+
+<script>
+var nlCatalog = lang_nl;
+var enCatalog = {
+    // output from the .po conversion
+    locale_data : {
+        "openjscad" : {
+            "" : {
+            "domain" : "openjscad",
+            "lang"   : "en",
+            "plural_forms" : "nplurals=2; plural=(n != 1);"
+            },
+            // no keys present in english! 
+        },
+    },
+    "domain" : "openjscad",
+        // This callback is called when a key is missing
+        "missing_key_callback" : function(key) {
+        // Do something with the missing key
+        return key;
+        //console.error(key);
+        },
+};
+//instantiate the catalog you want to use
+//var i18n = new Jed(nlCatalog);
+var i18n = new Jed(enCatalog);
+</script>
+
 <script lang=JavaScript>
 var version = '0.019 (2015/01/07)';
 //$(function() { $("#parametersdiv").draggable(); }); // doesn't work well, disabled

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+<!-- thingiverse.com/Benjamin with http://www.h2.dion.ne.jp/~defghi/img2svg/potraceHtml.htm-->
+
+<!-- based on : OpenJSCAD.org, written by Rene K. Mueller <spiritdude@gmail.com>, Licensed under MIT License ==
+   with some code from OpenJsCad processfile.html by Joost Nieuwenhuijse 
+   in conjunction with csg.js, openjscad.js, lightgl.js by various authors (see them listed in the individual files) -->
+   
+    <title>Stamp-o-Matic with OpenJSCAD</title>
+    <link type="text/css" href="assets/css/stencil-o-matic.css" rel="stylesheet" />
+    <link type="text/css" href="assets/css/smoothness/jquery-ui-1.10.4.custom.css" rel="stylesheet" />
+<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script> -->
+<!-- <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.18/jquery-ui.min.js"></script> -->
+    <script type="text/javascript" src="js/easeljs-0.7.1.min.js"></script>
+    <script type="text/javascript" src="js/potrace_outjsscad.js"></script>  
+    <script type="text/javascript" src="js/headerjscad.js"></script>    
+    
+    <link rel="stylesheet" href="js/jquery/themes/base/jquery-ui.css" />
+    <script src="js/jquery/jquery-1.9.1.js"></script>
+    <script src="js/jquery/jquery-ui.js"></script>
+    <script src="js/jquery/jquery.hammer.js"></script>
+    <link rel="stylesheet" href="assets/css/style.css" type="text/css">
+    <link rel="stylesheet" href="assets/css/openjscad.css" type="text/css">
+
+<script type="text/javascript">
+
+        var MAX_WIDTH = 512;
+        var MAX_HEIGHT = 384;
+        var img;
+        var stage;
+        var bmp;
+        var DELTA_INDEX;
+        var blurSlider, thresholdSlider;
+        var blurFilter;
+        var greyFilter;
+        var slideInterval = -1;
+        var scaleImg = 1;
+        var outputJSCAD;
+        
+        function init() {
+            if (window.top != window) {
+                document.getElementById("header").style.display = "none";
+            }
+            document.getElementById("loader").className = "loader";
+
+            img = new Image();
+            img.onload = handleImageLoad;
+            img.src = "assets/void.png";
+            
+            document.getElementById("file").onchange = function(e){
+                $("#svg").empty();
+                document.getElementById("selectBtn").style.display = "none";
+                document.getElementById("outputText").style.display = "none";
+                document.getElementById("timer").style.display = "none";
+                document.getElementById("settingsTable").style.display = "none";
+                /*document.getElementById("outputSettings").style.display = "none";*/
+                
+                document.getElementById("invertcb").checked = false;
+                
+                var files = e.target.files;
+                if(files.length == 0){
+                    return;
+                }
+                var file = files[0];
+                
+                if(!file.type.match(/image\/.+/)){
+                    return;
+                }
+                
+                if(file.type == "image/svg+xml"){
+                    return;
+                }
+                var reader = new FileReader();
+                reader.onload = function(){
+                    displayImage(reader.result);
+                };
+                reader.readAsDataURL(file);
+                
+                document.getElementById("settingsTable").style.display = "block";
+                $('.tools').css("display", "inline-block");
+                /*document.getElementById("outputSettings").style.display = "inline";   */
+                
+            };
+            
+            $('#invertcb').change(function() {
+                    invertImg();
+            });
+
+
+        } // init
+
+        function handleImageLoad() {            
+            document.getElementById("loader").className = "";           
+
+            var canvas = document.getElementById("imgCanvas");
+            var iRatio = img.width / img.height;
+                        
+            if (iRatio >= MAX_WIDTH/MAX_HEIGHT) {
+                canvas.width = Math.min(MAX_WIDTH, img.width);
+                canvas.height = canvas.width / iRatio;
+                scaleImg = Math.min(1, canvas.width / img.width);
+            } else {
+                canvas.height =  Math.min(MAX_HEIGHT, img.height);
+                canvas.width = canvas.height * iRatio;
+                scaleImg = Math.min(1, canvas.height / img.height);
+            }
+            
+            if (img.src.split("void.png").length > 1) {
+                $('#tracing').css("height", "28px");
+                $('.tools').css("display", "none");
+            } else {
+                $("#tracing").css("height", (384 + 60) + "px");
+                $("#tracing").css("width", (canvas.width + 512 + 10) + "px");
+                
+                $("#imgCanvas").css("display", "block");
+                $("#svg").css("display", "block");
+                $("#settingsTable").css("display", "inline-block");
+                $('.tools').css("display", "inline-block");
+            }
+            
+            stage = new createjs.Stage(canvas);
+   
+            bmp = new createjs.Bitmap(img);
+            bmp.scaleX = bmp.scaleY = scaleImg;
+            bmp.cache(0,0,img.width,img.height);
+            stage.addChild(bmp);            
+
+            $(".blurSlider").slider({
+                value: 1,
+                min: 0,
+                max: 12,
+                disabled:false,
+                change:handleChange,
+                slide: handleSlide
+            });
+            
+            $(".thresholdSlider").slider({
+                value: 40,
+                min: 0,
+                max: 100,
+                disabled:false,
+                change:handleChange,
+            });
+
+            $("#selectBtn").click(selectOutput);
+            $("input[name='outputversion']").change(function(){traceImage();});
+            applyEffect();
+        }
+
+        function invertImg() {
+            var c=document.getElementById("imgSrc");
+            var ctx=c.getContext("2d");
+            var imgData=ctx.getImageData(0,0,img.width,img.height);
+            for (var i=0;i<imgData.data.length;i+=4) {
+              imgData.data[i]=255-imgData.data[i];
+              imgData.data[i+1]=255-imgData.data[i+1];
+              imgData.data[i+2]=255-imgData.data[i+2];
+              imgData.data[i+3]=255;
+              }
+            ctx.putImageData(imgData,0,0);
+            
+            stage.removeChild(bmp);
+            bmp = new createjs.Bitmap(c);
+            bmp.scaleX = bmp.scaleY = scaleImg;
+            bmp.cache(0,0,img.width,img.height);
+            stage.addChild(bmp);
+            updateImage();
+            traceImage();
+        }
+                
+        function selectOutput() {
+            $("#outputText").focus();
+            $("#outputText").select();
+            $("#tracing").css("height", "28px");
+            $("#imgCanvas").css("display", "none");
+            $("#svg").css("display", "none");
+            $("#settingsTable").css("display", "none");
+            $('.tools').css("display", "none");
+            updateJsCad();
+        }
+
+        function updateJsCad (){    
+            $('#inputJsCad').val(headerJSCAD + outputJSCAD + footerJSCAD);
+            updateSolid();          
+        }
+        function handleSlide() {
+            if (slideInterval == -1) {
+                slideInterval = setInterval(applyEffect, 250);
+            }
+        }
+
+        function handleChange() {
+            clearInterval(slideInterval);
+            slideInterval = -1;
+            applyEffect();
+            traceImage();
+        }
+
+        function applyEffect() {
+            var blurValue = $(".blurSlider").slider("option", "value");
+            blurFilter = new createjs.BlurFilter(blurValue,  blurValue, 2);
+            
+            var greyscale = new createjs.ColorMatrix().adjustSaturation(-100);
+            greyFilter = new createjs.ColorMatrixFilter(greyscale);
+            
+            updateImage();
+        }
+
+        function updateImage() {
+            bmp.filters = [blurFilter, greyFilter];
+            bmp.updateCache();
+            stage.update();
+        }
+        
+        function displayImage(data){
+            img.src = data; 
+            var cSrc = document.getElementById('imgSrc');
+            var imgS = new Image();
+            imgS.src = data;
+            imgS.onload = function () {
+                cSrc.width = this.width;
+                cSrc.height = this.height;
+                cSrc.getContext('2d').drawImage(this,0,0);
+            }       
+    }
+        
+        function traceImage() {
+            $("#svg").empty();
+            
+            var timer = document.getElementById("timer")
+            timer.innerHTML = "";
+            var divText = document.getElementById("outputText");
+            divText.innerHTML = "";
+            
+            var start = new Date();
+            
+            var potimg = document.getElementById("imgCanvas");
+            var potwidth = potimg.width;
+            var potheight = potimg.height;
+        
+            var svg = document.getElementById("svg");
+            svg.setAttribute("width", potwidth);
+            svg.setAttribute("height", potheight);
+            svg.setAttribute("viewBox", [0,0,potwidth,potheight].join(" "));
+    
+            var thresholdValue = $(".thresholdSlider").slider("option", "value")/100;
+
+            Potrace.setParam({
+                threshold: thresholdValue,
+                turdSize:3,
+                turnPolicy:1,
+                alphamax:0.9,
+                precision:2
+            });
+            //var outputVersion = $("input:radio[name=outputversion]:checked").val();   
+            
+            var outputVersion = "stamp";
+            var gElem = Potrace.trace(potimg, outputVersion).toPathElements();
+            svg.appendChild(gElem);
+    
+            var gText = Potrace.outputScad();   
+            divText.innerHTML = gText;
+            outputJSCAD = gText;
+            
+            var end = new Date();
+            timer.innerHTML =  (end.getTime() - start.getTime()) + " ms";
+            
+            document.getElementById("selectBtn").style.display = "block";
+            /*document.getElementById("outputText").style.display = "block";
+            document.getElementById("timer").style.display = "block";*/
+        }
+    </script>
+
+    <style type="text/css">
+        .blurSlider { width:120px; }
+        .thresholdSlider {width:200px;}
+    </style>
+    
+</head>
+<body onload="onload(); init();">
+
+
+    <script src="js/lightgl.js"></script>
+    <script src="js/csg.js"></script>
+    <script src="js/openjscad.js"></script>
+    <script src="js/openscad.js"></script>
+    <script src="js/underscore.js"></script>
+<script lang=JavaScript>
+var version = '0.017 (2014/02/14)';
+//$(function() { $("#parametersdiv").draggable(); }); // doesn't work well, disabled
+var me = document.location.toString().match(/^file:/)?'web-offline':'web-online'; // me: {cli, web-offline, web-online}
+var browser = 'unknown';
+if(navigator.userAgent.match(/(opera|chrome|safari|firefox|msie)/i))
+   browser = RegExp.$1.toLowerCase();
+
+$(document).ready(function() {
+   $("#menu").height($(window).height());       // initial height
+   $("#viewer").height($(window).height());
+
+   $(window).resize(function() {                // adjust the relevant divs
+      $("#menu").height($(window).height());
+      $("#menuHandle").css({top: '45%'});
+      $("#viewer").width($(window).width());
+      $("#viewer").height($(window).height());
+   });
+   setTimeout( function(){$('#menu').css('left','-280px');},0); // -- hide slide-menu after 3secs
+
+   $('#menu').mouseleave(function() {
+      $('#examples').css('height',0); $('#examples').hide(); 
+      $('#options').css('height',0); $('#options').hide(); 
+   });
+
+
+   // -- Options 
+   $('#optionsTitle').click(function() {
+      $('#options').css('height','auto'); $('#options').show(); 
+      $('#examples').css('height',0); $('#examples').hide(); 
+   });
+   $('#options').mouseleave(function() {
+      $('#options').css('height',0); $('#options').hide(); 
+   });
+   getOptions();
+
+   //$('#optionsForm').submit(function() {
+   //   // save to cookie
+   //   $('#optionsForm').hide();
+   //   return false;
+   //});
+   $('#optionsForm').change(function() {
+      // save to cookie
+      saveOptions();
+   });
+   
+   $('#plate').change(function() {
+      if($('#plate').val()=='custom') {
+         $('#customPlate').show();
+      } else {
+         $('#customPlate').hide();
+      }
+   });
+});   
+</script>
+<!-- /////////////////////////////////////////////////////////////////////////////////////////// -->
+<div id=tracing>
+<canvas id="imgSrc" style="display:none"></canvas>
+
+    <div id="loader"></div>
+    <div id="tools">
+    <div id="outputSettings">
+        <table >
+        <tr>
+            <td><input id="file" type="file"></input></td>
+            <td class="tools"><input type="checkbox" id="invertcb" name="invert"></input><label for="invertcb">invert image</label></td>
+            <td class="tools"><span><img src="assets/void.png" width="15" height="10" /></span></td>
+            <td class="tools">
+            <!-- <input type="radio" value="stencil" id="stencil" name="outputversion" checked="checked">
+                <label for="stencil">stencil</label>
+                <input type="radio" value="stamp" id="stamp" name="outputversion">
+                <label for="stamp">stamp</label>
+                <input type="radio" value="cookie" id="cookie" name="outputversion">
+                <label for="cookie">cookie cutter</label> -->
+                <input type="radio" value="stamp" id="stamp" name="outputversion" style="display:none"></td>
+            <td class="tools"><span><img src="assets/void.png" width="15" height="10" /></td>
+            <td class="tools"><input id="selectBtn" type="button" value="Convert to stamp" style="display:none"></input></td>
+        </tr>
+        </table>        
+    </div>
+    
+    <table id="settingsTable" style="display:none">
+        <td>
+            <table cellspacing="2" border="0" cellpadding="2">
+                <tr>
+                    <th rowspan="1" align="center">Blur</th><td><div class="blurSlider"></div></td>
+                    <th rowspan="1" align="center">Threshold</th><td><div class="thresholdSlider"></div></td>
+                </tr>
+            </table>
+        </td>
+    </table>
+    </div>
+    
+    <canvas id="imgCanvas" width="320" height="200"></canvas>
+    <svg id="svg"></svg>
+    
+
+    <textarea id="outputText" width="120" style="display:none"></textarea>
+    
+    <div id="timer" style="display:none"></div>
+
+</div>
+<!-- /////////////////////////////////////////////////////////////////////////////////////////// -->
+<div id=menu>
+
+<img id=menuHandle src="imgs/menuHandleVL.png">
+<div style="position:absolute;top:0px;left:0px;"><a href="http://openjscad.org"><img id="header" src="imgs/title.png"></a></div>
+
+<nav>
+<div id=menuVersion>Version <script>document.write(version);</script></div>
+<p/>
+<table class=info>
+<tr><td align=right class=infoOperation>Rotate XZ</td><td class=infoKey>Left Mouse</td></tr>
+<tr><td align=right class=infoOperation>Pan</td><td class=infoKey>Middle Mouse or SHIFT + Left Mouse</td></tr>
+<tr><td align=right class=infoOperation>Rotate XY</td><td class=infoKey>Right Mouse or ALT + Left Mouse</td></tr>
+<tr><td align=right class=infoOperation>Zoom In/Out</td><td class=infoKey>Wheel Mouse or CTRL + Left Mouse</td></tr>
+</table>
+<p><a class=navlink href="#" onclick="$('#about').show(); return false;">About OpenJSCAD</a></p>
+
+
+<div style="position:relative;font-size:8pt;margin-top:40px;">
+<p><b>About the Stamp Factory</b></p>
+Thanks to <a href="http://potrace.sourceforge.net/">Potrace</a> by Peter Selinger.<br />
+Based on the javascript version by <a href="http://www.h2.dion.ne.jp/~defghi/img2svg/potraceHtml.htm">DEFGHI1977</a> and <a href="http://d.hatena.ne.jp/project_the_tower2/20110724/1311473645">George Nagaoka</a>, <a href="http://www.libspark.org/wiki/nitoyon/PotrAs">Nitoyon</a> (AS3 version).<br /> 
+Also based on <a href="http://createjs.com/#!/EaselJS">EaselJS</a> example.<br />
+Put together by
+<a href="http://thingiverse.com/Benjamin">Benjamin</a> as suggested by <a href="http://plus.google.com/+KurtMeister/">Kurt Meister.</a>
+<br />
+<small>June 2014</small>
+<br /><br /><br /><br />
+<b>Warning:</b> Complex shapes might take lot of process time. Start with simple ones to get an idea.
+</div>
+
+</nav>
+</div> <!-- /menu -->
+
+<div id=footer style="">
+OpenJSCAD.org 
+<script>document.write(version);</script>, MIT License &amp; GPLv2, get your own copy/clone/fork from <a target=_blank href="https://github.com/Spiritdude/OpenJSCAD.org">GitHub: OpenJSCAD</a>
+</div>
+
+<div id=about>
+<img src="imgs/title.png"><br>
+Version <script>document.write(version);</script>
+<p>
+by Ren&eacute; K. M&uuml;ller (UI & CLI),
+Joost Nieuwenhuijse (core), 
+Eduard Bespalov (core),
+Gary Hogdson (OpenSCAD translator)
+<p>csg.js core &amp; improvements by 
+Evan Wallace, 
+Eduard Bespalov, 
+Joost Nieuwenhuijse, 
+Alexandre Girard
+<p>
+Licenses: MIT License &amp; GPLv2<br>
+Get your copy/clone/fork from <a href="https://github.com/Spiritdude/OpenJSCAD.org" target=_blank>GitHub: OpenJSCAD</a>
+<p><br>
+<a class=okButton href='#' onclick="$('#about').hide(); return false;"> OK </a>
+</div>
+
+<div id="editor" style="display:none">// -- OpenJSCAD.org logo
+
+function main() {
+   return union(
+      difference(
+         cube({size: 3, center: true}),
+         sphere({r:2, center: true})
+      ),
+      intersection(
+          sphere({r: 1.3, center: true}),
+          cube({size: 2.1, center: true})
+      )
+   ).translate([0,0,1.5]).scale(10);
+}
+</div>
+
+<script>
+
+{
+   var options = [ 'renderCode', 'author', 'license' ];
+   var metakeys = [ 'author', 'license' ];
+   saveOptions = function() {
+      for(var k in options) {
+         k = options[k];
+         //echo("setting "+k);
+         setCookie(k,$('#'+k).val());
+         if(metakeys[k]) metadata[k] = options[k];
+      }
+   }
+   getOptions = function() {
+      for(var k in options) {
+         k = options[k];
+         //echo("getting "+k);
+         if(getCookie(k)) $('#'+k).val(getCookie(k))
+      }
+   }
+   
+   var src = '';
+   src += "<form id=optionsForm onsubmit='saveOptions(); return false'>";
+   src += "<div class=optionGroup><b>Your Identity / Full Name & Email</b><br/>";
+   src += "<input id=author type=text name=author size=30><div class=optionInfo>Applies when you export AMF (sets metadata)</div></div>";
+
+   var licenseOptions = {
+      "Public Domain": "Public Domain", 
+      "CC BY": "Creative Commons CC BY", 
+      "CC BY-ND": "Creative Commons CC BY-ND", 
+      "CC BY-NC": "Creative Commons CC BY-NC", 
+      "CC BY-SA": "Creative Commons CC BY-SA", 
+      "CC BY-NC-SA": "Creative Commons CC BY-NC-SA", 
+      "CC BY-NC-ND": "Creative Commons CC BY-NC-ND", 
+      "MIT": "MIT License", 
+      "GPLv2": "GPLv2", 
+      "GPLv3": "GPLv3", 
+      "Copyright": "Copyright",
+   };
+   src += "<div class=optionGroup><b>Default License</b><br/>";
+   src += "<select id=license name=license>";
+   for(var k in licenseOptions) {
+      src += "<option value='"+k+"'>"+licenseOptions[k];
+      src += "<br/>";
+   }
+   src += "</select><div class=optionInfo>Applies when you export AMF (sets metadata)</div></div>\n";
+
+   if(0) {
+      var renderCodeOptions = {
+         shiftReturn: "SHIFT+RETURN", 
+         auto: "Automatic"
+      };
+      src += "<div class=optionGroup><b>Render Code</b></br>";
+      src += "<select id=renderCode name=renderCode>";
+      for(var k in renderCodeOptions) {
+         src += "<option value='"+k+"'>"+renderCodeOptions[k];
+      }
+      src += "</select></div>";
+   }
+   if(1) {
+      var plateOptions = {
+         "200x200": "200mm x 200mm",
+         "150x150": "150mm x 150mm",
+         "100x100": "100mm x 100mm",
+         "custom": "Custom",
+         "none": "None",
+      };
+      src += "<div class=optionGroup><b>Plate</b></br>";
+      src += "<select id=plate name=plate>";
+      for(var k in plateOptions) {
+         src += "<option value='"+k+"'>"+plateOptions[k];
+      }
+      src += "</select><br/>";
+      src += "<div style='display: none' id=customPlate>Custom: <input type=text id=plateCustomX name=plateCustomX size=4 value='125'> x <input type=text id=plateCustomY name=plateCustomY size=4 value='125'> [mm]</div>";
+      src += "</div>";
+      
+   }
+   if(1) {
+      var themeOptions = {
+         "bright": "Bright",
+         "dark": "Dark",
+      };
+      src += "<div class=optionGroup><b>Theme</b></br>";
+      src += "<select id=theme name=theme>";
+      for(var k in themeOptions) {
+         src += "<option value='"+k+"'>"+themeOptions[k];
+      }
+      src += "</select><br/>";
+      src += "</div>";
+   }
+   
+   src += "</form>";
+   $('#options').html(src);
+}
+</script>
+
+<div oncontextmenu="return false;" id="viewer"></div> <!-- avoiding popup when right mouse is clicked -->
+
+<div id="parametersdiv"></div>
+<div id="tail">
+<div id="statusdiv"></div>
+<div id="errordiv"></div>
+
+<script id=conversionWorker type="javascript/worker">
+// adapted from http://www.html5rocks.com/en/tutorials/workers/basics/
+
+self.onmessage = function(e) {      // Worker to import STL/OBJ as it can take quite some while for 1MB+ large STLs
+   var data = e.data; // JSON.parse(e.data);
+   me = data.me;                    // required for openscad.js parse*() 
+   version = data.version;          //     ''               ''
+
+   if(data.url) {     // RANT: why do something simple, when it can be done complicate: Workers & importScripts() (guys!!)
+      var url = data.url;
+      url = url.replace(/#.*$/,'');    // -- just to be sure ...
+      url = url.replace(/\?.*$/,'');
+      var index = url.indexOf('index.html');
+      if(index!=-1) {
+         url = url.substring(0,index);
+      }
+      importScripts(url+'js/csg.js',url+'js/openjscad.js',url+'js/openscad.js');
+      var src, type;
+      data.filename.match(/\.(stl|obj|amf|gcode)$/i);
+      type = RegExp.$1;
+      if(type=='obj') {
+         src = parseOBJ(data.source,data.filename);
+      } else if(type=='amf') {
+         src = parseAMF(data.source,data.filename);
+      } else if(type=='gcode') {
+         src = parseGCode(data.source,data.filename);
+      } else {
+         src = parseSTL(data.source,data.filename);
+      }
+      self.postMessage({ source: src, filename: data.filename, url: data.remote });
+   }
+};
+</script>
+
+<script>
+var gCurrentFile = null;
+var gProcessor = null;
+var editor = null;
+
+var gCurrentFiles = [];       // linear array, contains files (to read)
+var gMemFs = [];              // associated array, contains file content in source gMemFs[i].{name,source}
+var gMemFsCount = 0;          // async reading: count of already read files
+var gMemFsTotal = 0;          // async reading: total files to read (Count==Total => all files read)
+var gMemFsChanged = 0;        // how many files have changed
+var gRootFs = [];             // root(s) of folders 
+
+var _includePath = './';
+
+function onload() {
+   gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
+  updateSolid();
+}
+
+function updateSolid() {
+  gProcessor.setJsCad(document.getElementById('inputJsCad').value);
+}
+
+function putSourceInEditor(src,fn) {
+   editor.setValue(src); 
+   editor.clearSelection();
+   editor.navigateFileStart();
+
+   previousFilename = fn;
+   previousScript = src;
+   gPreviousModificationTime = "";
+}
+
+// Show all exceptions to the user:
+OpenJsCad.AlertUserOfUncaughtExceptions();
+
+// ---------------------------------------------------------------------------------------------------------
+
+function setCookie(name, value, days) {
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        var expires = "; expires=" + date.toGMTString();
+    } else var expires = "";
+    document.cookie = escape(name) + "=" + escape(value) + expires + "; path=/";
+}
+
+function getCookie(name) {
+    var nameEQ = escape(name) + "=";
+    var ca = document.cookie.split(';');
+    for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return unescape(c.substring(nameEQ.length, c.length));
+    }
+    return null;
+}
+
+function deleteCookie(name) {
+    createCookie(name, "", -1);
+}
+
+</script>
+<textarea id="inputJsCad" style="display:none">
+
+function getParameterDefinitions() {
+return [
+    { name:'stamp_width', caption: 'Stamp width:', type: 'float', initial: 40.0 },
+    { name:'stamp_elevation', caption: 'Stamp elevation:', type: 'float', initial: 1.5 },
+    { name:'margin', caption: 'Margin:', type: 'float', initial: 0.5 },
+    { name:'base_thickness', caption: 'Base thickness:', type: 'float', initial: 1.5 }
+];
+}
+
+function main(params) {
+    
+    paths_array = paths_array = [[256, 256, 1],[1,[[150.23,33.5],[134.96,18.5],[134.73,46.5],[134.5,74.5],[71.75,74.75],[9,75],[9,128],[9,181],[71.75,181.25],[134.5,181.5],[135,209.08],[135.5,236.66],[191,182.91],[191,182.91],[212.574,161.97],[230.283,144.7],[246.79,128.33],[246.79,128.33],[243.679,124.89],[235.007,116.141],[206.29,88],[206.29,88],[189.244,71.481],[172.995,55.698],[150.23,33.5]]]];
+    
+    var input_width = paths_array[0][0];
+    var input_height = paths_array[0][1];
+    var tVersion = paths_array[0][2];
+
+    var dispo_width = params.stamp_width - 2*params.margin;
+    var sTrace = dispo_width/input_width;
+    var stamp_height = input_height*sTrace + 2*params.margin;
+    
+    var i, len, j, l, poly;
+    var stamp = new CSG();
+    
+    for (i=1, len=paths_array.length; i &lt; len; i++) {
+        poly = [paths_array[i][1][0]];
+        for (j=1, l=paths_array[i][1].length; j &lt; l; j++) {
+            point = paths_array[i][1][j];
+            if (point[0] === undefined && point[1] === undefined) continue;
+            if (point[0] == poly[poly.length -1][0] && point[1] == poly[poly.length -1][1]) continue;
+            
+            if (! alreadyInPath(poly, point)) {
+                poly.push(point);   
+            }
+        }
+        
+        if (paths_array[i][0] == 1) {
+            stamp = stamp.union(scale(sTrace, linear_extrude({height:(params.stamp_elevation+params.base_thickness)/sTrace}, polygon(poly))));
+        } else {
+            stamp = stamp.subtract(scale(sTrace, linear_extrude({height:(params.stamp_elevation+params.base_thickness)/sTrace}, polygon(poly))));
+        }
+    }
+    
+    stamp = stamp.translate([-sTrace*input_width/2, -sTrace*input_height/2, 0]);
+    stamp = stamp.setColor(0.5, 0.5, 0.6);
+    stamp = stamp.scale([-1, -1, 1]);
+
+    var base = CSG.cube({radius: [params.stamp_width/2, stamp_height/2, params.base_thickness/2]});
+    base = base.translate([0, 0, params.base_thickness/2]);
+    base = base.setColor(0.75, 0.75, 0.85);
+    
+    return base.union(stamp); 
+}
+
+function alreadyInPath(pArray, pPoint) {
+    for (var i=0, l=pArray.length; i &lt; l; i++) {
+        if (pPoint[0] == pArray[i][0] && pPoint[1] == pArray[i][1]) {
+            return true;        
+        }
+    }
+    return false;
+}
+
+
+</textarea>
+</body></html> 

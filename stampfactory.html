@@ -30,7 +30,7 @@ Todo:
 - saving source code edited in ACE locally, perhaps 'SaveAs' (.JSCAD, .STL, .AMF)
 - DONE: include(); support of multiple files, see http://jsfiddle.net/yybRu/
 -->
-<title>Ingegno.be - Lasercut Box Maker</title>
+<title>Ingegno.be - Stempel Maker</title>
 <link rel="shortcut icon" href="imgs/favicon.png" type="image/x-png">
 <link rel="stylesheet" href="jquery/themes/base/jquery-ui.css" />
 <script src="jquery/jquery-1.9.1.js"></script>
@@ -38,8 +38,23 @@ Todo:
 <script src="jquery/jquery.hammer.js"></script>
 <link rel="stylesheet" href="style.css" type="text/css">
 <link rel="stylesheet" href="openjscad.css" type="text/css">
+
+<script type="text/javascript" src="js/easeljs-0.7.1.min.js"></script>
+<script type="text/javascript" src="js/potrace_outjsscad.js"></script>  
+<script type="text/javascript" src="js/headerjscad.js"></script>    
+<link type="text/css" href="stampfactory.css" rel="stylesheet" />
+
+<!-- Now image load box for the top -->
+<script src="imageload_blur.js"></script>
+<style type="text/css">
+    .blurSlider { width:120px; }
+    .thresholdSlider {width:200px;}
+</style>
+
 </head>
-<body onload="onload()">
+
+
+<body onload="onload(); init_img_load();">
 <style>
 /* we choose chrome theme for ace, and make sure line number is transparent too */
 /* this has to stay in the body (not head) otherwise does not take effect */
@@ -121,16 +136,68 @@ $(document).ready(function() {
    });
 });   
 </script>
-<div id="header">
- <!-- <img src="imgs/title.png">  <!-- openjscad logo -->
-<div id="errordiv"></div>
+
+
+<!-- Input for image part////////////////////////////////////////////////// -->
+<div id=tracing>
+<canvas id="imgSrc" style="display:none"></canvas>
+
+    <div id="loader"></div>
+    <div id="tools">
+    <div id="outputSettings">
+        <table >
+        <tr>
+            <td><input id="file" type="file"></input></td>
+            <td class="tools"><input type="checkbox" id="invertcb" name="invert"></input><label for="invertcb">inverteer foto</label></td>
+            <td class="tools"><span><img src="imgs/void.png" width="15" height="10" /></span></td>
+            <td class="tools">
+            <!-- <input type="radio" value="stencil" id="stencil" name="outputversion" checked="checked">
+                <label for="stencil">stencil</label>
+                <input type="radio" value="stamp" id="stamp" name="outputversion">
+                <label for="stamp">stamp</label>
+                <input type="radio" value="cookie" id="cookie" name="outputversion">
+                <label for="cookie">cookie cutter</label> -->
+                <input type="radio" value="stempel" id="stamp" name="outputversion" style="display:none"></td>
+            <td class="tools"><span><img src="imgs/void.png" width="15" height="10" /></td>
+            <td class="tools"><input id="selectBtn" type="button" value="Maak er een stempel van" style="display:none"></input></td>
+        </tr>
+        </table>        
+    </div>
+    
+    <table id="settingsTable" style="display:none">
+        <td>
+            <table cellspacing="2" border="0" cellpadding="2">
+                <tr>
+                    <th rowspan="1" align="center">Vervagen</th><td><div class="blurSlider"></div></td>
+                    <th rowspan="1" align="center">Zwart/Wit Drempel</th><td><div class="thresholdSlider"></div></td>
+                </tr>
+            </table>
+        </td>
+    </table>
+    </div>
+    
+    <canvas id="imgCanvas" width="320" height="200"></canvas>
+    <svg id="svg"></svg>
+    
+
+    <textarea id="outputText" width="120" style="display:none"></textarea>
+    
+    <div id="timer" style="display:none"></div>
+
 </div>
+<!--  End Input for image part //////////////////////////////////////////// -->
+
+
+<div id="header">
+<!-- <img src="imgs/title.png"> <!-- openjscad logo -->
+<div id="errordiv"></div>
+</div> <!-- end header -->
 
 <div id=menu>
 <img id=menuHandle src="imgs/menuHandleVL.png">
 <nav>
 <!-- <div id=menuVersion>Version <script>document.write(version);</script></div>
-<p/>  <!-- openjscad version -->
+<p/>  <!-- Openjscad version -->
 <table class=info>
 <tr><td align=right class=infoOperation>Render Code</td><td class=infoKey>SHIFT + RETURN</td></tr>
 <tr><td align=right class=infoOperation>Rotate XZ</td><td class=infoKey>Left Mouse</td></tr>
@@ -140,10 +207,10 @@ $(document).ready(function() {
 </table>
 <table class=info>
 <tr><td class=infobox>
-Variant op BoxMaker: maak een doos om te lasercutten naar wens. Stel afmetingen van je doos in en een gewenste richtgrootte voor de tanden. Elke laser of CNC snijdt een stuk materiaal weg. Om  je doos netjes te laten aansluiten geef je bij <b>breedte laserstraal</b> in hoeveel materiaal weggesneden wordt. Alle afmetingen zijn in mm!
+Variant op <a target=_blank href="http://chaaawa.com/stamp_factory/">Stamp Factory</a> van <a target=_blank href="http://thingiverse.com/Benjamin">Benjamin</a> : een stempel maken op basis van een foto.
 </td></tr>
 <tr><td class=infobox>
-Om te lasercutten, Kies als Layout <b>Lasercut plaat</b>, genereer de dxf en download deze. Je kan de dxf openen in <a class=navlink href="https://inkscape.org/en/" target=_blank>Inkscape</a>, en opslaan in het formaat nodig voor je lasercutter (pdf, svg, ...). Wil je de doos 3D printen, kies <b>3D print plaat</b>, genereer de STL, en download deze om een 3D print mee te maken.
+<b>Opgelet:</b> Complexe vormen kunnen lang duren om een stempel van te maken! Begin met eenvoudige vormen om ervaring op te doen!
 </td></tr>
 </table>
 
@@ -155,15 +222,16 @@ Om te lasercutten, Kies als Layout <b>Lasercut plaat</b>, genereer de dxf en dow
         <a target=_blank href="http://ingegno.be/Manuals/lithophane/">Maak een Lithophane</a> Voor 3D printer.</td>
     </tr>
     <tr>
-        <td><b>Stempels</b>
-        <a target=_blank href="http://ingegno.be/Manuals/openjscad/stampfactory.html">Je eigen stempels maken</a>  Voor 3D printer.</td>
-    </tr>
-    <tr>
         <td><b>Kaarsen</b>
         <a target=_blank href="http://3km.ch/candlecaster/">Je eigen kaarsvormen maken</a> Of gebruik het als koekjessnijder! </td> 
     </tr>
     <tr>
-        <td><b>3D Ontwerpen</b> <a target=_blank href="http://openjscad.org/">OpenJSCAD.org</a> Zelf 3D figuren programmeren. Voor gevorderden.</td></tr>
+        <td><b>3D Ontwerpen</b> <a target=_blank href="http://openjscad.org/">OpenJSCAD.org</a> Zelf 3D figuren programmeren. Voor gevorderden.</td>
+    </tr>
+    <tr>
+        <td><b>Lasercut doos</b>
+        <a target=_blank href="http://ingegno.be/Manuals/openjscad/boxmaker.html">De ingegno doos maker</a>  Voor lasercutter of  3D printer.</td>
+    </tr>
 </table>
 
 <p>Door <a class=navlink href="http://ingegno.be" target=_blank>Ingegno.be <img src="imgs/externalLink.png" style=externalLink></a>
@@ -561,6 +629,10 @@ function onload() {
     gProcessor.viewer.setZoom(gProcessor.viewer.getZoom()*3);
 }
 
+function updateSolidFromString(jscadstring) {
+    gProcessor.setJsCad(jscadstring);
+}
+
 function updateSolid() {
     var blob = null;
     var xhr = new XMLHttpRequest();
@@ -570,7 +642,7 @@ function updateSolid() {
         gProcessor.setJsCad(myReader.result);
         });
 
-    xhr.open("GET", "examples/lasercut_box.jscad");
+    xhr.open("GET", "examples/stampfactory.jscad");
     xhr.responseType = "blob";//force the HTTP response, response-type header to be blob
     //when get is finished, we set the blob object, and read from it
     xhr.onload = function()
